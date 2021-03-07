@@ -23,14 +23,13 @@ const enum Const {
   ID_STRING = ';FFMETADATA',
   ID_CHAPTER = '[CHAPTER]',
   ID_STREAM = '[STREAM]',
-  VERSION = '1',
 }
 
 export function parse(text: string): FFMeta {
   const s = String(text);
 
-  if (!s.startsWith(Const.ID_STRING)) // TODO: add an error message
-    throw new SyntaxError();
+  if (!s.startsWith(Const.ID_STRING))
+    throw new SyntaxError(); // TODO: add an error message
 
   const lines = splitLines(s);
 
@@ -38,7 +37,7 @@ export function parse(text: string): FFMeta {
   const chapters: Chapter[] = [];
   const streams: Stream[] = [];
 
-  const meta: FFMeta = { metadata, chapters, streams };
+  const ffmeta: FFMeta = { metadata, chapters, streams };
 
   const length = lines.length;
 
@@ -53,9 +52,10 @@ export function parse(text: string): FFMeta {
       line = lines[++i];
 
       let TIMEBASE: string | undefined;
-      const tb = line.match(/TIMEBASE=([0-9]+\/[0-9]+)/);
-      if (tb !== null) {
-        [, TIMEBASE] = tb;
+      const tb = line && line.match(/TIMEBASE=([0-9]+)\\*\/([0-9]+)/);
+      if (tb) {
+        const [, num, dec] = tb;
+        TIMEBASE = `${num}/${dec}`;
         line = lines[++i];
       }
       const start = line && line.match(/START=([0-9]+)/);
@@ -72,29 +72,30 @@ export function parse(text: string): FFMeta {
 
       chapters.push({ TIMEBASE, START, END, metadata });
     } else {
-      let key, value;
+      let key: string | undefined, value: string | undefined;
+      const length = line.length;
       let i = 0;
       for (; i < length; i++) {
         const c = line[i];
         if (c === '\\') {
           i++;
         } else if (c === '=') {
-          key = line.slice(0, i);
-          value = line.slice(i + 1, length);
+          key = unescapeMetadataComponent(line.slice(0, i));
+          value = unescapeMetadataComponent(line.slice(i + 1, length));
           break;
         }
       }
       if (key === void 0 || value === void 0)
         throw new SyntaxError(`${key}=${value} ${line}`);
-      metadata[unescapeMetadataComponent(key)] = unescapeMetadataComponent(value);
+      metadata[key] = value;
     }
   }
 
-  return meta;
+  return ffmeta;
 }
 
-export function stringify(meta: FFMeta): string {
-  return '';
+export function stringify(ffmeta: FFMeta): string {
+  return `${Const.ID_STRING}1\n`;
 }
 
 function blankObject(): {} {
@@ -110,7 +111,7 @@ function splitLines(s: string) {
     const c = s[i];
     if (c === '\\') {
       i++;
-    } else if (c === '\r' || c === '\n' || c === '\0') {
+    } else if (c === '\n' || c === '\r' || c === '\0') {
       const line = s.slice(offset, i);
       let c;
       if (line !== '' && (c = line[0]) !== ';' && c !== '#') lines.push(line);
@@ -124,7 +125,7 @@ function splitLines(s: string) {
 }
 
 function escapeMetadataComponent(s: string) {
-  return String(s).replace(/[#;\\\n]/g, (c) => `\\${c}`);
+  return s.replace(/[#;\\\n]/g, (c) => `\\${c}`);
 }
 
 function unescapeMetadataComponent(s: string) {
