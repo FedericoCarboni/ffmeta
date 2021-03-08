@@ -19,6 +19,7 @@ export interface FFMeta {
   streams: Stream[];
 }
 
+// Constants to be inlined.
 const enum Const {
   ID_STRING = ';FFMETADATA',
   ID_CHAPTER = '[CHAPTER]',
@@ -26,18 +27,18 @@ const enum Const {
 }
 
 export function parse(text: string): FFMeta {
-  const s = String(text);
+  const s = `${text}`;
 
   if (!s.startsWith(Const.ID_STRING))
     throw new SyntaxError(); // TODO: add an error message
 
   const lines = splitLines(s);
 
-  let metadata: Tags = blankObject();
+  let metadata: Tags = Object.create(null);
   const chapters: Chapter[] = [];
   const streams: Stream[] = [];
 
-  const ffmeta: FFMeta = { metadata, chapters, streams };
+  const meta: FFMeta = { metadata, chapters, streams };
 
   const length = lines.length;
 
@@ -45,28 +46,36 @@ export function parse(text: string): FFMeta {
   for (; i < length; i++) {
     let line = lines[i]!;
     if (line === Const.ID_STREAM) {
-      metadata = blankObject();
-      streams.push({metadata});
+      metadata = Object.create(null);
+      streams.push({ metadata });
     } else if (line === Const.ID_CHAPTER) {
-      metadata = blankObject();
+      metadata = Object.create(null);
+
+      if (i >= length - 1)
+        throw new SyntaxError('Expected chapter start timestamp, found EOF');
+
       line = lines[++i];
 
       let TIMEBASE: string | undefined;
-      const tb = line && line.match(/TIMEBASE=([0-9]+)\\*\/([0-9]+)/);
-      if (tb) {
+      const tb = line.match(/TIMEBASE=([0-9]+)\\*\/([0-9]+)/);
+      if (tb !== null) {
         const [, num, dec] = tb;
         TIMEBASE = `${num}/${dec}`;
+        if (i >= length - 1)
+          throw new SyntaxError('Expected chapter start timestamp, found EOF');
         line = lines[++i];
       }
-      const start = line && line.match(/START=([0-9]+)/);
-      if (!start) {
-        throw new SyntaxError('Expected chapter start timestamp');
+      const start = line.match(/START=([0-9]+)/);
+      if (start === null) {
+        throw new SyntaxError('Expected chapter start timestamp ' + line);
       }
       const [, START] = start;
+      if (i >= length - 1)
+        throw new SyntaxError('Expected chapter end timestamp, found EOF');
       line = lines[++i];
-      const end = line && line.match(/END=([0-9]+)/);
-      if (!end) {
-        throw new SyntaxError('Expected chapter end timestamp');
+      const end = line.match(/END=([0-9]+)/);
+      if (end === null) {
+        throw new SyntaxError('Expected chapter end timestamp ' + line);
       }
       const [, END] = end;
 
@@ -91,15 +100,29 @@ export function parse(text: string): FFMeta {
     }
   }
 
-  return ffmeta;
+  return meta;
 }
 
-export function stringify(ffmeta: FFMeta): string {
-  return `${Const.ID_STRING}1\n`;
+export function stringify(meta: FFMeta): string {
+  const metadata = stringifyTags(meta.metadata);
+  const streams = meta.streams
+    .map(({ metadata }) => `${Const.ID_STREAM}\n${stringifyTags(metadata)}`)
+    .join('');
+  const chapters = meta.chapters
+    .map(({ TIMEBASE, START, END, metadata }) => {
+      return `${Const.ID_CHAPTER}\n${
+        TIMEBASE !== void 0 && TIMEBASE !== null ? `TIMEBASE=${TIMEBASE}\n` : ''
+      }START=${START}\nEND=${END}\n${stringifyTags(metadata)}`
+    })
+    .join('');
+  return `${Const.ID_STRING}1\n${metadata}${streams}${chapters}`;
 }
 
-function blankObject(): {} {
-  return Object.create(null);
+function stringifyTags(tags: Tags) {
+  return Object.entries(tags)
+    .filter(([, value]) => value !== void 0 && value !== null)
+    .map(([key, value]) => `${escapeMetadataComponent(key)}=${escapeMetadataComponent(`${value}`)}\n`)
+    .join('');
 }
 
 function splitLines(s: string) {
