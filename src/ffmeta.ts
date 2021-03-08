@@ -13,7 +13,7 @@ export interface Stream {
   metadata: Tags;
 }
 
-export interface FFMeta {
+export interface FFMetadata {
   metadata: Tags;
   chapters: Chapter[];
   streams: Stream[];
@@ -26,22 +26,23 @@ const enum Const {
   ID_STREAM = '[STREAM]',
 }
 
-export function parse(text: string): FFMeta {
-  const s = `${text}`;
+export function parse(source: string): FFMetadata {
+  // https://github.com/FFmpeg/FFmpeg/blob/7f1207cb79e79785ac837a9cd9f9ab6f0ba3462f/libavformat/ffmetadec.c#L31
+  // if (strict && !s.startsWith(Const.ID_STRING)) {
+  //   throw new SyntaxError(); // TODO: add an error message
+  // }
 
-  if (!s.startsWith(Const.ID_STRING))
-    throw new SyntaxError(); // TODO: add an error message
+  // Convert source to a string and split every line.
+  const lines = splitLines(`${source}`);
 
-  const lines = splitLines(s);
-
+  //
   let metadata: Tags = Object.create(null);
   const chapters: Chapter[] = [];
   const streams: Stream[] = [];
 
-  const meta: FFMeta = { metadata, chapters, streams };
+  const meta: FFMetadata = { metadata, chapters, streams };
 
   const length = lines.length;
-
   let i = 0;
   for (; i < length; i++) {
     let line = lines[i]!;
@@ -49,18 +50,15 @@ export function parse(text: string): FFMeta {
       metadata = Object.create(null);
       streams.push({ metadata });
     } else if (line === Const.ID_CHAPTER) {
-      metadata = Object.create(null);
 
       if (i >= length - 1)
         throw new SyntaxError('Expected chapter start timestamp, found EOF');
-
       line = lines[++i];
 
       let TIMEBASE: string | undefined;
-      const tb = line.match(/TIMEBASE=([0-9]+)\\*\/([0-9]+)/);
+      const tb = line.match(/TIMEBASE=([0-9]+\\*\/[0-9]+)/);
       if (tb !== null) {
-        const [, num, dec] = tb;
-        TIMEBASE = `${num}/${dec}`;
+        [, TIMEBASE] = tb;
         if (i >= length - 1)
           throw new SyntaxError('Expected chapter start timestamp, found EOF');
         line = lines[++i];
@@ -79,31 +77,32 @@ export function parse(text: string): FFMeta {
       }
       const [, END] = end;
 
+      metadata = Object.create(null);
       chapters.push({ TIMEBASE, START, END, metadata });
     } else {
-      let key: string | undefined, value: string | undefined;
       const length = line.length;
       let i = 0;
       for (; i < length; i++) {
         const c = line[i];
-        if (c === '\\') {
-          i++;
-        } else if (c === '=') {
-          key = unescapeMetadataComponent(line.slice(0, i));
-          value = unescapeMetadataComponent(line.slice(i + 1, length));
+        if (c === '=') {
+          const key = unescapeMetaComponent(line.slice(0, i));
+          const value = unescapeMetaComponent(line.slice(i + 1, length));
+          metadata[key] = value;
+
+          // Read just until the first unescaped `=`
           break;
+        } else if (c === '\\') {
+          // The next character is escaped, skip it
+          i++;
         }
       }
-      if (key === void 0 || value === void 0)
-        throw new SyntaxError(`${key}=${value} ${line}`);
-      metadata[key] = value;
     }
   }
 
   return meta;
 }
 
-export function stringify(meta: FFMeta): string {
+export function stringify(meta: FFMetadata): string {
   const metadata = stringifyTags(meta.metadata);
   const streams = meta.streams
     .map(({ metadata }) => `${Const.ID_STREAM}\n${stringifyTags(metadata)}`)
@@ -121,36 +120,36 @@ export function stringify(meta: FFMeta): string {
 function stringifyTags(tags: Tags) {
   return Object.entries(tags)
     .filter(([, value]) => value !== void 0 && value !== null)
-    .map(([key, value]) => `${escapeMetadataComponent(key)}=${escapeMetadataComponent(`${value}`)}\n`)
+    .map(([key, value]) => `${escapeMetaComponent(key)}=${escapeMetaComponent(`${value}`)}\n`)
     .join('');
 }
 
-function splitLines(s: string) {
-  const length = s.length;
+function splitLines(source: string) {
+  const length = source.length;
   const lines = [];
   let offset = 0;
   let i = 0;
   for (; i < length; i++) {
-    const c = s[i];
+    const c = source[i];
     if (c === '\\') {
       i++;
     } else if (c === '\n' || c === '\r' || c === '\0') {
-      const line = s.slice(offset, i);
+      const line = source.slice(offset, i);
       let c;
       if (line !== '' && (c = line[0]) !== ';' && c !== '#') lines.push(line);
       offset = i + 1; // Skip \n
     }
   }
-  const line = s.slice(offset, i);
+  const line = source.slice(offset, i);
   let c;
   if (line !== '' && (c = line[0]) !== ';' && c !== '#') lines.push(line);
   return lines;
 }
 
-function escapeMetadataComponent(s: string) {
-  return s.replace(/[#;\\\n]/g, (c) => `\\${c}`);
+function escapeMetaComponent(s: string) {
+  return s.replace(/[=;#\\\n]/g, (c) => `\\${c}`);
 }
 
-function unescapeMetadataComponent(s: string) {
+function unescapeMetaComponent(s: string) {
   return s.replace(/\\(.|\n|\r)|(\\$)/g, (s) => s.slice(1));
 }
