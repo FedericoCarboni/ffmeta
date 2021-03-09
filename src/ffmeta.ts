@@ -15,8 +15,8 @@ export interface Stream {
 
 export interface FFMetadata {
   metadata: Tags;
-  chapters: Chapter[];
   streams: Stream[];
+  chapters: Chapter[];
 }
 
 // Constants to be inlined.
@@ -28,8 +28,8 @@ const enum Const {
 
 export function parse(source: string): FFMetadata {
   // https://github.com/FFmpeg/FFmpeg/blob/7f1207cb79e79785ac837a9cd9f9ab6f0ba3462f/libavformat/ffmetadec.c#L31
-  // if (strict && !s.startsWith(Const.ID_STRING)) {
-  //   throw new SyntaxError(); // TODO: add an error message
+  // if (!s.startsWith(Const.ID_STRING)) {
+  //   throw new SyntaxError();
   // }
 
   // Convert source to a string and split every line.
@@ -40,16 +40,16 @@ export function parse(source: string): FFMetadata {
   const chapters: Chapter[] = [];
   const streams: Stream[] = [];
 
-  const meta: FFMetadata = { metadata, chapters, streams };
+  const meta: FFMetadata = { metadata, streams, chapters };
 
   const length = lines.length;
   let i = 0;
   for (; i < length; i++) {
     let line = lines[i]!;
-    if (line === Const.ID_STREAM) {
+    if (line.startsWith(Const.ID_STREAM)) {
       metadata = Object.create(null);
       streams.push({ metadata });
-    } else if (line === Const.ID_CHAPTER) {
+    } else if (line.startsWith(Const.ID_CHAPTER)) {
 
       if (i >= length - 1)
         throw new SyntaxError('Expected chapter start timestamp, found EOF');
@@ -98,7 +98,7 @@ export function parse(source: string): FFMetadata {
       }
     }
   }
-
+  console.log(JSON.stringify(meta, null, 2));
   return meta;
 }
 
@@ -125,20 +125,22 @@ function stringifyTags(tags: Tags) {
 }
 
 function splitLines(source: string) {
-  const length = source.length;
   const lines = [];
+  // Adjusted for bug 9144, a bug in libavformat that prevents
+  // makes escaping inconsistent with \n (newline characters).
+  let prev;
   let offset = 0;
   let i = 0;
+  const length = source.length;
   for (; i < length; i++) {
     const c = source[i];
-    if (c === '\\') {
-      i++;
-    } else if (c === '\n' || c === '\r' || c === '\0') {
+    if (prev !== '\\' && (c === '\n' || c === '\r' || c === '\0')) {
       const line = source.slice(offset, i);
       let c;
       if (line !== '' && (c = line[0]) !== ';' && c !== '#') lines.push(line);
       offset = i + 1; // Skip \n
     }
+    prev = c;
   }
   const line = source.slice(offset, i);
   let c;
