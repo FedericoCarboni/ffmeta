@@ -44,8 +44,9 @@ export function parse(source: string): FFMetadata {
 
   const ffmetadata: FFMetadata = { metadata, streams, chapters };
 
-  const lastIndex = lines.length - 1;
-  for (let i = 0; i < lines.length; i++) {
+  const length = lines.length;
+  const lastIndex = length - 1;
+  for (let i = 0; i < length; i++) {
     let line = lines[i]!;
     // https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/ffmetadec.c#L184
     if (line.startsWith(Const.ID_STREAM)) {
@@ -86,8 +87,9 @@ export function parse(source: string): FFMetadata {
       metadata = Object.create(null);
       chapters.push({ TIMEBASE, START, END, metadata });
     } else {
+      const length = line.length;
       // Parse a tag.
-      for (let i = 0; i < line.length; i++) {
+      for (let i = 0; i < length; i++) {
         const c = line[i];
         // Read until the first unescaped `=`.
         if (c === '=') {
@@ -147,8 +149,9 @@ function stringifyTags(tags: Tags) {
 
 function splitLines(source: string) {
   const lines = [];
-  // Adjusted for bug 9144, a bug in libavformat that prevents
-  // makes escaping inconsistent with \n (newline characters).
+  // Adjusted for bug 9144, a bug in libavformat that makes
+  // escaping inconsistent with \n (newline characters).
+  // A backslash at the end of a value cannot be escaped properly.
   let prev: string | undefined;
   let offset = 0;
   let i = 0;
@@ -157,16 +160,21 @@ function splitLines(source: string) {
     const c = source[i];
     if (prev !== '\\' && (c === '\n' || c === '\r' || c === '\0')) {
       const line = source.slice(offset, i);
-      let c;
-      if (line !== '' && (c = line[0]) !== ';' && c !== '#') lines.push(line);
+      if (isNonEmpty(line))
+        lines.push(line);
       offset = i + 1; // Skip \n
     }
     prev = c;
   }
   const line = source.slice(offset, i);
-  let c;
-  if (line !== '' && (c = line[0]) !== ';' && c !== '#') lines.push(line);
+  if (isNonEmpty(line))
+    lines.push(line);
   return lines;
+}
+
+function isNonEmpty(line: string) {
+  let c;
+  return line !== '' && (c = line[0]) !== ';' && c !== '#';
 }
 
 function escapeMetaComponent(s: string) {
