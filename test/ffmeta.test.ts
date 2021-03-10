@@ -19,25 +19,25 @@ describe('ffmeta', () => {
     it('should set __proto__ to any value', () => {
       const {
         metadata,
-        chapters: [{ metadata: chapter }],
-        streams: [{ metadata: stream }]
+        chapters: [chapter],
+        streams: [stream]
       } = ffmeta.parse(PROTO);
       expect(Object.keys(metadata)).toContain('__proto__');
-      expect(Object.keys(chapter)).toContain('__proto__');
-      expect(Object.keys(stream)).toContain('__proto__');
-      expect(metadata.__proto__).toBe('value');
-      expect(chapter.__proto__).toBe('value');
-      expect(stream.__proto__).toBe('value');
+      expect(Object.keys(chapter!.metadata)).toContain('__proto__');
+      expect(Object.keys(stream!.metadata)).toContain('__proto__');
+      expect(metadata['__proto__']).toBe('value');
+      expect(chapter!.metadata['__proto__']).toBe('value');
+      expect(stream!.metadata['__proto__']).toBe('value');
     });
     it('should implement bug 9144', () => {
       const {
         metadata,
-        chapters: [{ metadata: chapter }],
-        streams: [{ metadata: stream }]
+        chapters: [chapter],
+        streams: [stream]
       } = ffmeta.parse(BUG_9144);
-      expect(metadata.key).toBe('value\\\nunfortunately=multiline');
-      expect(chapter.key).toBe('value\\\nunfortunately=multiline');
-      expect(stream.key).toBe('value\\\nunfortunately=multiline');
+      expect(metadata['key']).toBe('value\\\nunfortunately=multiline');
+      expect(chapter!.metadata['key']).toBe('value\\\nunfortunately=multiline');
+      expect(stream!.metadata['key']).toBe('value\\\nunfortunately=multiline');
     });
     it('should throw SyntaxError on invalid end', () => {
       ffmeta.parse(INVALID_END)

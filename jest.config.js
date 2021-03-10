@@ -30,6 +30,12 @@ const config = {
   // A preset that is used as a base for Jest's configuration
   preset: 'ts-jest',
 
+  globals: {
+    'ts-jest': {
+      tsconfig: 'test/tsconfig.json',
+    },
+  },
+
   // The paths to modules that run some code to configure or set up the testing environment before each test
   setupFiles: [],
 

@@ -1,4 +1,9 @@
 {
   "extends": "../tsconfig.json",
-  "exclude": []
+  "compilerOptions": {
+    "types": ["node", "jest"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
+  },
+  "include": ["**/*"]
 }
