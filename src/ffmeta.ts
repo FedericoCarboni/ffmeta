@@ -19,7 +19,8 @@ export interface FFMetadata {
   chapters: Chapter[];
 }
 
-// Constants to be inlined.
+// These constants will be inlined by TypeScript.
+// https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/ffmeta.h
 const enum Const {
   ID_STRING = ';FFMETADATA',
   ID_CHAPTER = '[CHAPTER]',
@@ -27,94 +28,114 @@ const enum Const {
 }
 
 export function parse(source: string): FFMetadata {
-  // https://github.com/FFmpeg/FFmpeg/blob/7f1207cb79e79785ac837a9cd9f9ab6f0ba3462f/libavformat/ffmetadec.c#L31
+  // https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/ffmetadec.c#L31
   // if (!s.startsWith(Const.ID_STRING)) {
   //   throw new SyntaxError();
   // }
 
-  // Convert source to a string and split every line.
+  // Convert source to a string and split on unescaped newlines.
   const lines = splitLines(`${source}`);
 
-  //
+  // The metadata of the current section, may be the global
+  // section, a stream or a chapter.
   let metadata: Tags = Object.create(null);
   const chapters: Chapter[] = [];
   const streams: Stream[] = [];
 
-  const meta: FFMetadata = { metadata, streams, chapters };
+  const ffmetadata: FFMetadata = { metadata, streams, chapters };
 
-  const length = lines.length;
-  let i = 0;
-  for (; i < length; i++) {
+  const lastIndex = lines.length - 1;
+  for (let i = 0; i < lines.length; i++) {
     let line = lines[i]!;
+    // https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/ffmetadec.c#L184
     if (line.startsWith(Const.ID_STREAM)) {
       metadata = Object.create(null);
       streams.push({ metadata });
     } else if (line.startsWith(Const.ID_CHAPTER)) {
-
-      if (i >= length - 1)
+      // Parse the START, END and optionally TIMESTAMP values of the chapter.
+      // Read the next line or throw a syntax error if there are no more lines.
+      if (i === lastIndex)
         throw new SyntaxError('Expected chapter start timestamp, found EOF');
-      line = lines[++i];
+      line = lines[++i]!;
 
+      // TIMEBASE is optional, if the line doesn't match it will be parsed as START.
       let TIMEBASE: string | undefined;
-      const tb = line.match(/TIMEBASE=([0-9]+\\*\/[0-9]+)/);
-      if (tb !== null) {
-        [, TIMEBASE] = tb;
-        if (i >= length - 1)
+      const timebaseMatch = line.match(/^TIMEBASE=([0-9]+\\*\/[0-9]+)/);
+      if (timebaseMatch !== null) {
+        [, TIMEBASE] = timebaseMatch;
+        if (i === lastIndex)
           throw new SyntaxError('Expected chapter start timestamp, found EOF');
-        line = lines[++i];
+        line = lines[++i]!;
       }
-      const start = line.match(/START=([0-9]+)/);
-      if (start === null) {
-        throw new SyntaxError('Expected chapter start timestamp ' + line);
-      }
-      const [, START] = start;
-      if (i >= length - 1)
+
+      // START and END are not optional, if the lines don't match throw a syntax error.
+      const startMatch = line.match(/^START=([0-9]+)/);
+      if (startMatch === null)
+        throw new SyntaxError(`Expected chapter start timestamp, found ${line}`);
+      const START = startMatch[1]!;
+
+      if (i === lastIndex)
         throw new SyntaxError('Expected chapter end timestamp, found EOF');
-      line = lines[++i];
-      const end = line.match(/END=([0-9]+)/);
-      if (end === null) {
-        throw new SyntaxError('Expected chapter end timestamp ' + line);
-      }
-      const [, END] = end;
+      line = lines[++i]!;
+
+      const endMatch = line.match(/^END=([0-9]+)/);
+      if (endMatch === null)
+        throw new SyntaxError(`Expected chapter end timestamp, found ${line}`);
+      const END = endMatch[1]!;
 
       metadata = Object.create(null);
       chapters.push({ TIMEBASE, START, END, metadata });
     } else {
-      const length = line.length;
-      let i = 0;
-      for (; i < length; i++) {
+      // Parse a tag.
+      for (let i = 0; i < line.length; i++) {
         const c = line[i];
+        // Read until the first unescaped `=`.
         if (c === '=') {
           const key = unescapeMetaComponent(line.slice(0, i));
-          const value = unescapeMetaComponent(line.slice(i + 1, length));
+          const value = unescapeMetaComponent(line.slice(i + 1));
           metadata[key] = value;
-
-          // Read just until the first unescaped `=`
           break;
         } else if (c === '\\') {
-          // The next character is escaped, skip it
+          // The next character is escaped, skip it.
           i++;
         }
       }
     }
   }
-  console.log(JSON.stringify(meta, null, 2));
-  return meta;
+
+  return ffmetadata;
 }
 
-export function stringify(meta: FFMetadata): string {
-  const metadata = stringifyTags(meta.metadata);
-  const streams = meta.streams
+export function stringify(ffmetadata: FFMetadata): string {
+  // https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/ffmetaenc.c
+  const metadata = stringifyTags(ffmetadata.metadata);
+  const streams = ffmetadata.streams
     .map(({ metadata }) => `${Const.ID_STREAM}\n${stringifyTags(metadata)}`)
     .join('');
-  const chapters = meta.chapters
+  const chapters = ffmetadata.chapters
     .map(({ TIMEBASE, START, END, metadata }) => {
-      return `${Const.ID_CHAPTER}\n${
-        TIMEBASE !== void 0 && TIMEBASE !== null ? `TIMEBASE=${TIMEBASE}\n` : ''
-      }START=${START}\nEND=${END}\n${stringifyTags(metadata)}`
+      let timebase: string | undefined;
+      if (TIMEBASE !== void 0 && TIMEBASE !== null) {
+        timebase = `${TIMEBASE}`;
+        if (!/^[0-9]+\/[0-9]+$/.test(timebase))
+          throw new TypeError(`${timebase} is not a valid timebase fraction`);
+      }
+
+      const start = `${START}`;
+      if (!isInt(start))
+        throw new TypeError(`${start} is not a valid start timestamp`);
+      const end = `${END}`;
+      if (!isInt(end))
+        throw new TypeError(`${end} is not a valid end timestamp`);
+
+      return `${Const.ID_CHAPTER}\n${timebase ? `TIMEBASE=${timebase}\n` : ''}START=${start}\nEND=${end}\n${stringifyTags(metadata)}`;
     })
     .join('');
   return `${Const.ID_STRING}1\n${metadata}${streams}${chapters}`;
+}
+
+function isInt(s: string) {
+  return /^[0-9]+$/.test(s);
 }
 
 function stringifyTags(tags: Tags) {
@@ -128,7 +149,7 @@ function splitLines(source: string) {
   const lines = [];
   // Adjusted for bug 9144, a bug in libavformat that prevents
   // makes escaping inconsistent with \n (newline characters).
-  let prev;
+  let prev: string | undefined;
   let offset = 0;
   let i = 0;
   const length = source.length;
