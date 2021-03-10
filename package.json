@@ -2,9 +2,15 @@
   "name": "ffmeta",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "types": "./dist/ffmeta.d.ts",
+  "main": "./dist/ffmeta.js",
+  "module": "./dist/ffmeta.mjs",
+  "exports": {
+    "import": "./dist/ffmeta.mjs",
+    "require": "./dist/ffmeta.js"
+  },
   "scripts": {
-    "build": "tsc --module commonjs --declaration --outDir dist -p tsconfig.json && tsc --module esnext --outDir dist/esm -p tsconfig.json",
+    "build": "rollup -c",
     "test": "jest"
   },
   "repository": {
@@ -22,9 +28,11 @@
   },
   "homepage": "https://github.com/FedericoCarboni/ffmeta#readme",
   "devDependencies": {
+    "@rollup/plugin-typescript": "^8.2.0",
     "@types/jest": "^26.0.20",
     "@types/node": "^14.14.32",
     "jest": "^26.6.3",
+    "rollup": "^2.41.0",
     "ts-jest": "^26.5.3",
     "tslib": "^2.1.0",
     "typescript": "^4.2.3"
