@@ -28,11 +28,7 @@ const enum Const {
 }
 
 export function parse(source: string): FFMetadata {
-  // https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/ffmetadec.c#L31
-  // if (!s.startsWith(Const.ID_STRING)) {
-  //   throw new SyntaxError();
-  // }
-
+  // https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/ffmetadec.c
   // Convert source to a string and split on unescaped newlines.
   const lines = splitLines(`${source}`);
 
