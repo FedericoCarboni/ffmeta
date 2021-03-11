@@ -168,9 +168,11 @@ function splitLines(source: string) {
     }
     prev = c;
   }
-  const line = source.slice(offset, i);
-  if (isNonEmpty(line))
-    lines.push(line);
+  if (offset !== i) {
+    const line = source.slice(offset, i);
+    if (isNonEmpty(line))
+      lines.push(line);
+  }
   return lines;
 }
 
