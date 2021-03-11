@@ -2,6 +2,7 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "module": "commonjs",
+    "rootDir": "../",
     "types": ["node", "jest"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true
