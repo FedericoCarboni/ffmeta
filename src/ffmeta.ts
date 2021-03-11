@@ -119,10 +119,11 @@ export function stringify(ffmetadata: FFMetadata): string {
       let timebase: string | undefined;
       if (TIMEBASE !== void 0 && TIMEBASE !== null) {
         timebase = `${TIMEBASE}`;
+        // TIMEBASE is optional, when given it must be a fraction.
         if (!/^[0-9]+\/[0-9]+$/.test(timebase))
           throw new TypeError(`${timebase} is not a valid timebase fraction`);
       }
-
+      // START and END must be strings containing an integer.
       const start = `${START}`;
       if (!isInt(start))
         throw new TypeError(`${start} is not a valid start timestamp`);
@@ -178,9 +179,9 @@ function isNonEmpty(line: string) {
 }
 
 function escapeMetaComponent(s: string) {
-  return s.replace(/[=;#\\\n]/g, (c) => `\\${c}`);
+  return s.replace(/[=;#\\\n]/g, '\\$&');
 }
 
 function unescapeMetaComponent(s: string) {
-  return s.replace(/\\(.|\n|\r)/g, (s) => s.slice(1));
+  return s.replace(/\\(.|\n|\r)/g, '$1');
 }
