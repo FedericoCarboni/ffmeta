@@ -9,6 +9,7 @@ function readSample(name: string) {
 const PROTO = readSample('proto.ffmeta');
 const BUG_9144 = readSample('bug-9144.ffmeta');
 const ESCAPING = readSample('escaping.ffmeta');
+const NO_NEWLINE = readSample('no-newline.ffmeta');
 const INVALID_END = readSample('invalid-end.ffmeta');
 const INVALID_END_EOF = readSample('invalid-end-eof.ffmeta');
 const INVALID_START = readSample('invalid-start.ffmeta');
@@ -41,6 +42,10 @@ describe('ffmeta', () => {
       expect(chapter!.metadata['key']).toBe('value\\\nunfortunately=multiline');
       expect(stream!.metadata['key']).toBe('value\\\nunfortunately=multiline');
     });
+    it('should parse an ffmeta file without a trailing newline', () => {
+      const ffmetadata = ffmeta.parse(NO_NEWLINE);
+      expect(ffmetadata.metadata['key']).toBe('value');
+    });
     it('should unescape keys and values', () => {
       const {
         metadata,
@@ -59,6 +64,12 @@ describe('ffmeta', () => {
       expect(chapter2!.TIMEBASE).toBe('1/1000');
       expect(chapter2!.START).toBe('0');
       expect(chapter2!.END).toBe('0');
+    });
+    it('should parse an empty ffmeta file', () => {
+      const ffmetadata = ffmeta.parse(';FFMETADATA1');
+      expect(Object.keys(ffmetadata.metadata).length).toBe(0);
+      expect(ffmetadata.streams.length).toBe(0);
+      expect(ffmetadata.chapters.length).toBe(0);
     });
     it('should throw SyntaxError on invalid end', () => {
       expect(() => ffmeta.parse(INVALID_END)).toThrow(SyntaxError);
