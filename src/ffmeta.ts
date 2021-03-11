@@ -182,5 +182,5 @@ function escapeMetaComponent(s: string) {
 }
 
 function unescapeMetaComponent(s: string) {
-  return s.replace(/\\(.|\n|\r)|(\\$)/g, (s) => s.slice(1));
+  return s.replace(/\\(.|\n|\r)/g, (s) => s.slice(1));
 }
