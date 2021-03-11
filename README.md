@@ -1,13 +1,13 @@
 # ffmeta
-A pure JavaScript implementation of FFMETADATA parsing and serialization. `ffmeta` follows closely
+A pure JavaScript implementation of ffmetadata parsing and serialization. `ffmeta` follows closely
 the `libavformat`'s implementation to be as consistent as possible with FFmpeg's tools.
 
 # Usage
 `ffmeta` exports two functions, `parse()` and `stringify()`.
-Use `parse()` to parse a string containing an FFMETADATA file, it will throw a SyntaxError if the
+Use `parse()` to parse a string containing an ffmetadata file, it will throw a SyntaxError if the
 input is invalid or return an object representation of the metadata.
-Use `stringify()` to turn an object representation of the metadata into an FFMETADATA file, it may
-throw a TypeError if a chapter has invalid TIMEBASE, START or END .
+Use `stringify()` to turn an object representation of the metadata into an ffmetadata file, it may
+throw a TypeError if a chapter has invalid `TIMEBASE`, `START` or `END` .
 
 Node.js example.
 ```ts
