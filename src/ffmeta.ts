@@ -61,9 +61,10 @@ export function parse(source: string): FFMetadata {
 
       // TIMEBASE is optional, if the line doesn't match it will be parsed as START.
       let TIMEBASE: string | undefined;
-      const timebaseMatch = line.match(/^TIMEBASE=([0-9]+\\*\/[0-9]+)/);
+      const timebaseMatch = line.match(/^TIMEBASE=([0-9]+)\\*\/([0-9]+)/);
       if (timebaseMatch !== null) {
-        [, TIMEBASE] = timebaseMatch;
+        const [, num, den] = timebaseMatch;
+        TIMEBASE = `${num}/${den}`;
         if (i === lastIndex)
           throw new SyntaxError('Expected chapter start timestamp, found EOF');
         line = lines[++i]!;
